@@ -1,0 +1,95 @@
+ <!DOCTYPE html>
+
+<! 3D Cloth Simulation                  >
+<!                                      >
+<! Written by:  Evan Newman             >
+<! Date:        February 2020           >
+<! Contact      evanmnewman1@gmail.com  >
+
+<html>
+
+<head>
+
+<meta charset="UTF-8">
+<title>3D Cloth</title>
+
+<script src='http://abubujs.org/libs/Abubu.latest.js'
+type='text/javascript'></script>
+<script src='testshaders.js' type='text/javascript'></script>
+<script src='ClothLib.js' type='text/javascript'></script>
+
+</head>
+
+<body>
+<canvas  id="main-canvas" 
+         width=512 height=512
+         style="border:1px solid #000000;" >
+   <!-- This message is displayed if canvas is not available -->
+   Your browser does not support the HTML5 canvas tag.
+</canvas>
+
+<script>
+	console.log('--- 3D Cloth Simulation by Evan Newman ---');
+
+	var modelParams = {
+		clothWidth : 5,
+		clothHeight : 5,
+		timestep : 1,
+		frameRatio : 10, // updates per frame
+		displayWidth : 512,
+		displayHeight : 512
+	}
+
+	var mainCanvas = document.getElementById('main-canvas');
+	mainCanvas.width = modelParams.displayWidth;
+	mainCanvas.height = modelParams.displayHeight;
+
+	var vertexPoints = genClothGridPoints(modelParams.clothWidth,
+											modelParams.clothHeight, 0.25);
+	var geometryPoints = genClothGeometryPoints(modelParams.clothWidth,
+												modelParams.clothHeight,
+												vertexPoints);
+	
+	var myGeometry = {
+	    vertices : geometryPoints,
+	    noVertices: geometryPoints.length/3, // No of vertices
+	    noCoords  : 3, // No of coordinates
+	    premitive : 'triangle_strip' ,
+	};
+
+	var testSolver = new Abubu.Solver({
+		vertexShader : testVS,
+		fragmentShader : testFS,
+		geometry : myGeometry,
+		canvas : mainCanvas,
+		clear : true
+	});
+
+	// stuff to cap the frame rate
+	var gameState = 0;
+	var t0 = performance.now();
+	var accumulator = 0;
+	var OPTIMAL_DT = 1000/60; // ms per frame
+
+	var render = function() {
+		// stuff to cap the frame rate	
+		if (gameState <= 1) {
+			var t = performance.now()
+			accumulator += t - t0
+
+			while (gameState == 0 && accumulator >= OPTIMAL_DT) {
+				testSolver.render();
+
+				accumulator -= OPTIMAL_DT;
+			}
+
+			t0 = t;
+		}
+		requestAnimationFrame(render);
+	}
+	render();
+
+</script>
+
+</body>
+</html>
