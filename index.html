@@ -48,6 +48,7 @@
 
 	document.addEventListener('keydown', camera.keyDownHandler, false);
 	document.addEventListener('keyup', camera.keyUpHandler, false);
+	document.addEventListener('mousemove', camera.mouseHandler, false);
 
 
 	//print4x4Array(camera.perspectiveMatrix);
@@ -72,7 +73,7 @@
 		canvas : mainCanvas,
 		clear : true,
 		uniforms : {
-			cameraMatrix : {type: 'mat4', value: camera.cameraMatrix}
+			cameraMatrix : {type: 'mat4', value: camera.getCameraMatrix()}
 			//modelMatrix :
 		}
 	});
@@ -91,11 +92,11 @@
 		canvas : mainCanvas,
 		clear : false,
 		uniforms : {
-			cameraMatrix : {type: 'mat4', value: camera.cameraMatrix}
+			cameraMatrix : {type: 'mat4', value: camera.getCameraMatrix()}
 		}
 	});
 
-	console.log(camera.cameraMatrix);
+	console.log(camera.getCameraMatrix());
 
 	// stuff to cap the frame rate
 	var gameState = 0;
@@ -111,8 +112,8 @@
 
 			while (gameState == 0 && accumulator >= OPTIMAL_DT) {
 				camera.updateCameraMatrix();
-				testSheetSolver.setUniform("cameraMatrix", camera.cameraMatrix);
-				testLineSolver.setUniform("cameraMatrix", camera.cameraMatrix);
+				testSheetSolver.setUniform("cameraMatrix", camera.getCameraMatrix());
+				testLineSolver.setUniform("cameraMatrix", camera.getCameraMatrix());
 				testSheetSolver.render();
 				testLineSolver.render();
 				accumulator -= OPTIMAL_DT;

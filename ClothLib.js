@@ -1,52 +1,58 @@
 
 // Class to controll the camera projection and view matricies
+var keyWDown = false;
+var keyADown = false;
+var keySDown = false;
+var keyDDown = false;
+var keyShiftDown = false;
+var keySpaceDown = false;
+var keyFToggle = false;
+
+var mouseDiffX = 0.0;
+var mouseDiffY = 0.0;
+
 class CameraMatrixController {
 	constructor(options={}) {
 		this.flySpeed = Abubu.readOption(options.flySpeed, 0.1);
-		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.001);
-		this.positionX = Abubu.readOption(options.positionX, 0.0);
-		this.positionY = Abubu.readOption(options.positionY, 0.0);
-		this.positionZ = Abubu.readOption(options.positionZ, 0.0);
+		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.01);
+
+		this.position = Abubu.readOption(options.position, vec3.fromValues(0.0, 0.0, 0.0));
+		this.rotation = Abubu.readOption(options.rotation, vec2.fromValues(0.0, 0.0));
 
 		this.fieldOfView = Abubu.readOption(options.fieldOfView, Math.PI/2.0);
 		this.aspectRatio = Abubu.readOption(options.aspectRatio, 1.0);
 		this.nearZClip = Abubu.readOption(options.nearZClip, 1.0);
 		this.farZClip = Abubu.readOption(options.farZClip, 15.0);
 
-		this.cameraMatrix = mat4.create();
-		mat4.perspective(this.cameraMatrix, this.fieldOfView,
+		this.perspectiveMatrix = mat4.create();
+		mat4.perspective(this.perspectiveMatrix, this.fieldOfView,
 		 				 this.aspectRatio, this.nearZClip, this.farZClip);
-		var translationVector = [this.positionX, this.positionY, this.positionZ]
-		mat4.translate(this.cameraMatrix, this.cameraMatrix, translationVector);
-
-		this.keyWDown = false;
-		this.keyADown = false;
-		this.keySDown = false;
-		this.keyDDown = false;
-		this.keyShiftDown = false;
-		this.keySpaceDown = false;
 	}
 
 	keyDownHandler(event) {
 		switch (event.keyCode) {
 		case 87:
-			this.keyWDown = true;
-			console.log("tick");
+			keyWDown = true;
 			break;
 		case 65:
-			this.keyADown = true; 
+			keyADown = true; 
 			break;
 		case 83:
-			this.keySDown = true; 
+			keySDown = true; 
 			break;
 		case 68:
-			this.keyDDown = true;
+			keyDDown = true;
 			break;
 		case 16:
-			this.keyShiftDown = true;
+			keyShiftDown = true;
 			break;
 		case 32:
-			this.keySpaceDown = true;
+			keySpaceDown = true;
+			break;
+		case 70:
+			keyFToggle = !keyFToggle;
+			mouseDiffX = 0.0;
+			mouseDiffY = 0.0;
 			break;
 		default:
 		}
@@ -55,64 +61,64 @@ class CameraMatrixController {
 	keyUpHandler(event) {
 		switch (event.keyCode) {
 		case 87:
-			this.keyWDown = false
-			console.log("tock");
+			keyWDown = false
 			break;
 		case 65:
-			this.keyADown = false; 
+			keyADown = false; 
 			break;
 		case 83:
-			this.keySDown = false; 
+			keySDown = false; 
 			break;
 		case 68:
-			this.keyDDown = false;
+			keyDDown = false;
 			break;
 		case 16:
-			this.keyShiftDown = false;
+			keyShiftDown = false;
 			break;
 		case 32:
-			this.keySpaceDown = false;
+			keySpaceDown = false;
 			break;
 		default:
 		}
 	}
 
+	mouseHandler(event) {
+		mouseDiffX += event.movementX;
+		mouseDiffY += event.movementY;
+	}
+
 	updateCameraMatrix() {
-		console.log(this.keyWDown);
-		if (this.keyWDown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[0.0, 0.0, this.flySpeed]);
-			console.log("updated W");
-		}
+		if (keyFToggle) {
+			this.rotation[0] -= mouseDiffY*this.rotateSpeed;
+			this.rotation[1] -= mouseDiffX*this.rotateSpeed;
 
-		if (this.keyADown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[-this.flySpeed, 0.0, 0.0]);
-		}
+			mouseDiffX = 0.0;
+			mouseDiffY = 0.0;
 
-		if (this.keySDown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[0.0, 0.0, -this.flySpeed]);
-		}
+			var forwards = [0.0, 0.0, -this.flySpeed];
+			vec3.rotateY(forwards, forwards, [0.0, 0.0, 0.0], this.rotation[1]);
+			var right = vec3.clone(forwards);
+			right[0] = -forwards[2];
+			right[2] = forwards[0]; 
 
-		if (this.keyDDown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[this.flySpeed, 0.0, 0.0]);
-		}
+			if (keyWDown) vec3.add(this.position, this.position, forwards);
+			if (keySDown) vec3.scaleAndAdd(this.position, this.position, forwards, -1.0);
+			if (keyDDown) vec3.add(this.position, this.position, right);
+			if (keyADown) vec3.scaleAndAdd(this.position, this.position, right, -1.0);
+			if (keyShiftDown) vec3.add(this.position, this.position, [0.0, -this.flySpeed, 0.0]);
+			if (keySpaceDown) vec3.add(this.position, this.position, [0.0, this.flySpeed, 0.0]);
 
-		if (this.keyShiftDown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[0.0, -this.flySpeed, 0.0]);
-		}
-
-		if (this.keySpaceDown) {
-			mat4.translate(this.cameraMatrix, this.cameraMatrix,
-							[0.0, this.flySpeed, 0.0]);
 		}
 	}
 
-	get getCameraMatrix() {
-		return this.cameraMatrix;
+	getCameraMatrix() {
+		var cameraMatrix = mat4.clone(this.perspectiveMatrix);
+		var rotationInv = [-this.rotation[0], -this.rotation[1]];
+		var positionInv = [-this.position[0], -this.position[1], -this.position[2]];
+		mat4.rotateX(cameraMatrix, cameraMatrix, rotationInv[0]);
+		mat4.rotateY(cameraMatrix, cameraMatrix, rotationInv[1]);
+		mat4.translate(cameraMatrix, cameraMatrix, positionInv)
+		return cameraMatrix;
 	}
 }
 
@@ -142,7 +148,7 @@ function genClothGridPoints(width, height, scale=1) {
 		}
 	}
 
-	return clothPoints
+	return clothPoints;
 }
 
 // Generates the set of points needed to define the WebGL geometry
