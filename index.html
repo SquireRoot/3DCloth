@@ -34,7 +34,6 @@
 		clothWidth : 5,
 		clothHeight : 5,
 		timestep : 1,
-		frameRatio : 10, // updates per frame
 		displayWidth : 512,
 		displayHeight : 512
 	}
@@ -43,26 +42,60 @@
 	mainCanvas.width = modelParams.displayWidth;
 	mainCanvas.height = modelParams.displayHeight;
 
+	var camera = new CameraMatrixController({
+		canvas : mainCanvas,
+	});
+
+	document.addEventListener('keydown', camera.keyDownHandler, false);
+	document.addEventListener('keyup', camera.keyUpHandler, false);
+
+
+	//print4x4Array(camera.perspectiveMatrix);
+
 	var vertexPoints = genClothGridPoints(modelParams.clothWidth,
 											modelParams.clothHeight, 0.25);
 	var geometryPoints = genClothGeometryPoints(modelParams.clothWidth,
 												modelParams.clothHeight,
 												vertexPoints);
 	
-	var myGeometry = {
+	var sheetGeometry = {
 	    vertices : geometryPoints,
 	    noVertices: geometryPoints.length/3, // No of vertices
 	    noCoords  : 3, // No of coordinates
 	    premitive : 'triangle_strip' ,
 	};
 
-	var testSolver = new Abubu.Solver({
+	var testSheetSolver = new Abubu.Solver({
 		vertexShader : testVS,
-		fragmentShader : testFS,
-		geometry : myGeometry,
+		fragmentShader : testSheetFS,
+		geometry : sheetGeometry,
 		canvas : mainCanvas,
-		clear : true
+		clear : true,
+		uniforms : {
+			cameraMatrix : {type: 'mat4', value: camera.cameraMatrix}
+			//modelMatrix :
+		}
 	});
+
+	var lineGeometry = {
+	    vertices : geometryPoints,
+	    noVertices: geometryPoints.length/3, // No of vertices
+	    noCoords  : 3, // No of coordinates
+	    premitive : 'line_strip' ,
+	};
+
+	var testLineSolver = new Abubu.Solver({
+		vertexShader : testVS,
+		fragmentShader : testLineFS,
+		geometry : lineGeometry,
+		canvas : mainCanvas,
+		clear : false,
+		uniforms : {
+			cameraMatrix : {type: 'mat4', value: camera.cameraMatrix}
+		}
+	});
+
+	console.log(camera.cameraMatrix);
 
 	// stuff to cap the frame rate
 	var gameState = 0;
@@ -77,10 +110,13 @@
 			accumulator += t - t0
 
 			while (gameState == 0 && accumulator >= OPTIMAL_DT) {
-				testSolver.render();
-
+				camera.updateCameraMatrix();
+				testSheetSolver.setUniform("cameraMatrix", camera.cameraMatrix);
+				testLineSolver.setUniform("cameraMatrix", camera.cameraMatrix);
+				testSheetSolver.render();
+				testLineSolver.render();
 				accumulator -= OPTIMAL_DT;
-			}
+			} 
 
 			t0 = t;
 		}

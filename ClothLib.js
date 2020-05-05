@@ -1,9 +1,124 @@
-class CameraControl {
-	constructor(opts={}) {
-		this.flySpeed = 0.001;
-		this.rotateSpeed = 0.001;
-		this.positionX = 0;
-		this.positionY = 0;
+
+// Class to controll the camera projection and view matricies
+class CameraMatrixController {
+	constructor(options={}) {
+		this.flySpeed = Abubu.readOption(options.flySpeed, 0.1);
+		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.001);
+		this.positionX = Abubu.readOption(options.positionX, 0.0);
+		this.positionY = Abubu.readOption(options.positionY, 0.0);
+		this.positionZ = Abubu.readOption(options.positionZ, 0.0);
+
+		this.fieldOfView = Abubu.readOption(options.fieldOfView, Math.PI/2.0);
+		this.aspectRatio = Abubu.readOption(options.aspectRatio, 1.0);
+		this.nearZClip = Abubu.readOption(options.nearZClip, 1.0);
+		this.farZClip = Abubu.readOption(options.farZClip, 15.0);
+
+		this.cameraMatrix = mat4.create();
+		mat4.perspective(this.cameraMatrix, this.fieldOfView,
+		 				 this.aspectRatio, this.nearZClip, this.farZClip);
+		var translationVector = [this.positionX, this.positionY, this.positionZ]
+		mat4.translate(this.cameraMatrix, this.cameraMatrix, translationVector);
+
+		this.keyWDown = false;
+		this.keyADown = false;
+		this.keySDown = false;
+		this.keyDDown = false;
+		this.keyShiftDown = false;
+		this.keySpaceDown = false;
+	}
+
+	keyDownHandler(event) {
+		switch (event.keyCode) {
+		case 87:
+			this.keyWDown = true;
+			console.log("tick");
+			break;
+		case 65:
+			this.keyADown = true; 
+			break;
+		case 83:
+			this.keySDown = true; 
+			break;
+		case 68:
+			this.keyDDown = true;
+			break;
+		case 16:
+			this.keyShiftDown = true;
+			break;
+		case 32:
+			this.keySpaceDown = true;
+			break;
+		default:
+		}
+	}
+
+	keyUpHandler(event) {
+		switch (event.keyCode) {
+		case 87:
+			this.keyWDown = false
+			console.log("tock");
+			break;
+		case 65:
+			this.keyADown = false; 
+			break;
+		case 83:
+			this.keySDown = false; 
+			break;
+		case 68:
+			this.keyDDown = false;
+			break;
+		case 16:
+			this.keyShiftDown = false;
+			break;
+		case 32:
+			this.keySpaceDown = false;
+			break;
+		default:
+		}
+	}
+
+	updateCameraMatrix() {
+		console.log(this.keyWDown);
+		if (this.keyWDown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[0.0, 0.0, this.flySpeed]);
+			console.log("updated W");
+		}
+
+		if (this.keyADown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[-this.flySpeed, 0.0, 0.0]);
+		}
+
+		if (this.keySDown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[0.0, 0.0, -this.flySpeed]);
+		}
+
+		if (this.keyDDown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[this.flySpeed, 0.0, 0.0]);
+		}
+
+		if (this.keyShiftDown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[0.0, -this.flySpeed, 0.0]);
+		}
+
+		if (this.keySpaceDown) {
+			mat4.translate(this.cameraMatrix, this.cameraMatrix,
+							[0.0, this.flySpeed, 0.0]);
+		}
+	}
+
+	get getCameraMatrix() {
+		return this.cameraMatrix;
+	}
+}
+
+class Cloth {
+	constructor(options={}) {
+
 	}
 }
 
@@ -42,23 +157,30 @@ function genClothGeometryPoints(width, height, vertexPoints) {
 	var clothPoints = new Array(3*(height - 1)*(2*width + 2));
 
 	for (var y = 0; y < height - 1; y++) {
-		clothPoints[3*(y*(2*width + 2))] = vertexPoints[3*width*y];
-		clothPoints[3*(y*(2*width + 2)) + 1] = vertexPoints[3*width*y + 1];
-		clothPoints[3*(y*(2*width + 2)) + 2] = vertexPoints[3*width*y + 2];
+		var clothPointsIdx0 = 3*(y*(2*width + 2));
+		var vertPointsIdx0 = 3*width*y; 
+		clothPoints[clothPointsIdx0] = vertexPoints[vertPointsIdx0];
+		clothPoints[clothPointsIdx0 + 1] = vertexPoints[vertPointsIdx0 + 1];
+		clothPoints[clothPointsIdx0 + 2] = vertexPoints[vertPointsIdx0 + 2];
 
 		for (var x = 0; x < width; x++) {
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1)] = vertexPoints[3*(width*y + x)];
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1) + 1] = vertexPoints[3*(width*y + x)+ 1];
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1) + 2] = vertexPoints[3*(width*y + x) + 2];
+			var clothPointsIdx = 3*(y*(2*width + 2) + 2*x + 1);
+			var vertPointsIdx = 3*(width*y + x);
+			clothPoints[clothPointsIdx] = vertexPoints[vertPointsIdx];
+			clothPoints[clothPointsIdx + 1] = vertexPoints[vertPointsIdx + 1];
+			clothPoints[clothPointsIdx + 2] = vertexPoints[vertPointsIdx + 2];
 
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1) + 3] = vertexPoints[3*(width*(y + 1) + x)];
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1) + 4] = vertexPoints[3*(width*(y + 1) + x) + 1];
-			clothPoints[3*(y*(2*width + 2) + 2*x + 1) + 5] = vertexPoints[3*(width*(y + 1) + x) + 2];
+			var vertPointsNextRowIdx = 3*(width*(y + 1) + x);
+			clothPoints[clothPointsIdx + 3] = vertexPoints[vertPointsNextRowIdx];
+			clothPoints[clothPointsIdx + 4] = vertexPoints[vertPointsNextRowIdx + 1];
+			clothPoints[clothPointsIdx + 5] = vertexPoints[vertPointsNextRowIdx + 2];
 		}
 
-		clothPoints[3*(y*(2*width + 2) + 2*width + 1)] = vertexPoints[3*(width*(y + 1) + width - 1)];
-		clothPoints[3*(y*(2*width + 2) + 2*width + 1) + 1] = vertexPoints[3*(width*(y + 1) + width - 1) + 1];
-		clothPoints[3*(y*(2*width + 2) + 2*width + 1) + 2] = vertexPoints[3*(width*(y + 1) + width - 1) + 2];
+		var clothPointsIdxLast = 3*(y*(2*width + 2) + 2*width + 1);
+		var vertPointsIdxLast = 3*(width*(y + 1) + width - 1);
+		clothPoints[clothPointsIdxLast] = vertexPoints[vertPointsIdxLast];
+		clothPoints[clothPointsIdxLast + 1] = vertexPoints[vertPointsIdxLast + 1];
+		clothPoints[clothPointsIdxLast + 2] = vertexPoints[vertPointsIdxLast + 2];
 	}
 
 	return clothPoints;
@@ -71,7 +193,16 @@ function printVertexArray(array) {
 	for (var i = 0; i < array.length; i = i + 3) {
 		console.log("(".concat(array[i], " ",
 							  array[i + 1], " ",
-							  array[i + 2]), ") vertex number = ", i/3);
+							  array[i + 2], ") vertex number = ", i/3));
+	}
+}
+
+function print4x4Array(array) {
+	for (var i = 0; i < array.length; i = i + 4) {
+		console.log("(".concat(array[i], " ",
+							  array[i + 1], " ",
+							  array[i + 2], " ",
+							  array[i + 3], "), row ", i/4));
 	}
 }
 
