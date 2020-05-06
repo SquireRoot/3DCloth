@@ -57,9 +57,9 @@ class CameraMatrixController {
 	}
 
 	static pointerLockHandler(event) {
-		if (!(document.pointerLockElement === requestedElement ||
-		    document.mozPointerLockElement === requestedElement ||
-		    document.webkitPointerLockElement === requestedElement)) {
+		if (!(document.pointerLockElement === CameraMatrixController.canvas ||
+		    document.mozPointerLockElement === CameraMatrixController.canvas ||
+		    document.webkitPointerLockElement === CameraMatrixController.canvas)) {
 		  // Pointer was just unlocked
 			CameraMatrixController.flyToggle = false;
 		}
