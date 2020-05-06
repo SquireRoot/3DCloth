@@ -1,18 +1,21 @@
 
 // Class to controll the camera projection and view matricies
-var keyWDown = false;
-var keyADown = false;
-var keySDown = false;
-var keyDDown = false;
-var keyShiftDown = false;
-var keySpaceDown = false;
-var keyFToggle = false;
-
-var mouseDiffX = 0.0;
-var mouseDiffY = 0.0;
-
 class CameraMatrixController {
+	static keyWDown = false;
+	static keyADown = false;
+	static keySDown = false;
+	static keyDDown = false;
+	static keyShiftDown = false;
+	static keySpaceDown = false;
+	static flyToggle = false;
+
+	static mouseDiffX = 0.0;
+	static mouseDiffY = 0.0;
+
+	static canvas; 
+
 	constructor(options={}) {
+
 		this.flySpeed = Abubu.readOption(options.flySpeed, 0.1);
 		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.01);
 
@@ -29,71 +32,110 @@ class CameraMatrixController {
 		 				 this.aspectRatio, this.nearZClip, this.farZClip);
 	}
 
-	keyDownHandler(event) {
+	static addListeners(canvas) {
+		CameraMatrixController.canvas = canvas;
+
+		document.addEventListener('keydown', CameraMatrixController.keyDownHandler, false);
+		document.addEventListener('keyup', CameraMatrixController.keyUpHandler, false);
+		document.addEventListener('mousemove', CameraMatrixController.mouseHandler, false);
+
+
+		canvas.requestPointerLock = canvas.requestPointerLock ||
+									canvas.mozRequestPointerLock ||
+									canvas.webkitRequestPointerLock;
+
+		document.exitPointerLock = document.exitPointerLock ||
+								   document.mozExitPointerLock ||
+								   document.webkitExitPointerLock;
+
+		document.addEventListener('pointerlockchange',
+								  CameraMatrixController.pointerLockHandler, false);
+		document.addEventListener('mozpointerlockchange', 
+								  CameraMatrixController.pointerLockHandler, false);
+		document.addEventListener('webkitpointerlockchange',
+								  CameraMatrixController.pointerLockHandler, false);
+	}
+
+	static pointerLockHandler(event) {
+		if (!(document.pointerLockElement === requestedElement ||
+		    document.mozPointerLockElement === requestedElement ||
+		    document.webkitPointerLockElement === requestedElement)) {
+		  // Pointer was just unlocked
+			CameraMatrixController.flyToggle = false;
+		}
+	}
+
+	static keyDownHandler(event) {
 		switch (event.keyCode) {
 		case 87:
-			keyWDown = true;
+			CameraMatrixController.keyWDown = true;
 			break;
 		case 65:
-			keyADown = true; 
+			CameraMatrixController.keyADown = true; 
 			break;
 		case 83:
-			keySDown = true; 
+			CameraMatrixController.keySDown = true; 
 			break;
 		case 68:
-			keyDDown = true;
+			CameraMatrixController.keyDDown = true;
 			break;
 		case 16:
-			keyShiftDown = true;
+			CameraMatrixController.keyShiftDown = true;
 			break;
 		case 32:
-			keySpaceDown = true;
+			CameraMatrixController.keySpaceDown = true;
 			break;
 		case 70:
-			keyFToggle = !keyFToggle;
-			mouseDiffX = 0.0;
-			mouseDiffY = 0.0;
+			CameraMatrixController.flyToggle = !CameraMatrixController.flyToggle;
+			if (CameraMatrixController.flyToggle) {
+				CameraMatrixController.canvas.requestPointerLock();
+			} else {
+				document.exitPointerLock();
+			}
+
+			CameraMatrixController.mouseDiffX = 0.0;
+			CameraMatrixController.mouseDiffY = 0.0;
 			break;
 		default:
 		}
 	}
 
-	keyUpHandler(event) {
+	static keyUpHandler(event) {
 		switch (event.keyCode) {
 		case 87:
-			keyWDown = false
+			CameraMatrixController.keyWDown = false
 			break;
 		case 65:
-			keyADown = false; 
+			CameraMatrixController.keyADown = false; 
 			break;
 		case 83:
-			keySDown = false; 
+			CameraMatrixController.keySDown = false; 
 			break;
 		case 68:
-			keyDDown = false;
+			CameraMatrixController.keyDDown = false;
 			break;
 		case 16:
-			keyShiftDown = false;
+			CameraMatrixController.keyShiftDown = false;
 			break;
 		case 32:
-			keySpaceDown = false;
+			CameraMatrixController.keySpaceDown = false;
 			break;
 		default:
 		}
 	}
 
-	mouseHandler(event) {
-		mouseDiffX += event.movementX;
-		mouseDiffY += event.movementY;
+	static mouseHandler(event) {
+		CameraMatrixController.mouseDiffX += event.movementX;
+		CameraMatrixController.mouseDiffY += event.movementY;
 	}
 
 	updateCameraMatrix() {
-		if (keyFToggle) {
-			this.rotation[0] -= mouseDiffY*this.rotateSpeed;
-			this.rotation[1] -= mouseDiffX*this.rotateSpeed;
+		if (CameraMatrixController.flyToggle) {
+			this.rotation[0] -= CameraMatrixController.mouseDiffY*this.rotateSpeed;
+			this.rotation[1] -= CameraMatrixController.mouseDiffX*this.rotateSpeed;
 
-			mouseDiffX = 0.0;
-			mouseDiffY = 0.0;
+			CameraMatrixController.mouseDiffX = 0.0;
+			CameraMatrixController.mouseDiffY = 0.0;
 
 			var forwards = [0.0, 0.0, -this.flySpeed];
 			vec3.rotateY(forwards, forwards, [0.0, 0.0, 0.0], this.rotation[1]);
@@ -101,12 +143,12 @@ class CameraMatrixController {
 			right[0] = -forwards[2];
 			right[2] = forwards[0]; 
 
-			if (keyWDown) vec3.add(this.position, this.position, forwards);
-			if (keySDown) vec3.scaleAndAdd(this.position, this.position, forwards, -1.0);
-			if (keyDDown) vec3.add(this.position, this.position, right);
-			if (keyADown) vec3.scaleAndAdd(this.position, this.position, right, -1.0);
-			if (keyShiftDown) vec3.add(this.position, this.position, [0.0, -this.flySpeed, 0.0]);
-			if (keySpaceDown) vec3.add(this.position, this.position, [0.0, this.flySpeed, 0.0]);
+			if (CameraMatrixController.keyWDown) vec3.add(this.position, this.position, forwards);
+			if (CameraMatrixController.keySDown) vec3.scaleAndAdd(this.position, this.position, forwards, -1.0);
+			if (CameraMatrixController.keyDDown) vec3.add(this.position, this.position, right);
+			if (CameraMatrixController.keyADown) vec3.scaleAndAdd(this.position, this.position, right, -1.0);
+			if (CameraMatrixController.keyShiftDown) vec3.add(this.position, this.position, [0.0, -this.flySpeed, 0.0]);
+			if (CameraMatrixController.keySpaceDown) vec3.add(this.position, this.position, [0.0, this.flySpeed, 0.0]);
 
 		}
 	}

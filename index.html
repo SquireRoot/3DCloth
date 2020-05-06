@@ -42,16 +42,9 @@
 	mainCanvas.width = modelParams.displayWidth;
 	mainCanvas.height = modelParams.displayHeight;
 
-	var camera = new CameraMatrixController({
-		canvas : mainCanvas,
-	});
+	var camera = new CameraMatrixController();
 
-	document.addEventListener('keydown', camera.keyDownHandler, false);
-	document.addEventListener('keyup', camera.keyUpHandler, false);
-	document.addEventListener('mousemove', camera.mouseHandler, false);
-
-
-	//print4x4Array(camera.perspectiveMatrix);
+	CameraMatrixController.addListeners(mainCanvas);
 
 	var vertexPoints = genClothGridPoints(modelParams.clothWidth,
 											modelParams.clothHeight, 0.25);
@@ -95,8 +88,6 @@
 			cameraMatrix : {type: 'mat4', value: camera.getCameraMatrix()}
 		}
 	});
-
-	console.log(camera.getCameraMatrix());
 
 	// stuff to cap the frame rate
 	var gameState = 0;
