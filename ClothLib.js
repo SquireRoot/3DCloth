@@ -16,15 +16,15 @@ class CameraMatrixController {
 
 	constructor(options={}) {
 
-		this.flySpeed = Abubu.readOption(options.flySpeed, 0.1);
+		this.flySpeed = Abubu.readOption(options.flySpeed, 0.08);
 		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.01);
 
-		this.position = Abubu.readOption(options.position, vec3.fromValues(0.0, 0.0, 0.0));
-		this.rotation = Abubu.readOption(options.rotation, vec2.fromValues(0.0, 0.0));
+		this.position = Abubu.readOption(options.position, [0, 0, 1.0]);
+		this.rotation = Abubu.readOption(options.rotation, [0.0, 0.0]);
 
 		this.fieldOfView = Abubu.readOption(options.fieldOfView, Math.PI/2.0);
 		this.aspectRatio = Abubu.readOption(options.aspectRatio, 1.0);
-		this.nearZClip = Abubu.readOption(options.nearZClip, 1.0);
+		this.nearZClip = Abubu.readOption(options.nearZClip, 0.5);
 		this.farZClip = Abubu.readOption(options.farZClip, 15.0);
 
 		this.perspectiveMatrix = mat4.create();
@@ -60,7 +60,7 @@ class CameraMatrixController {
 		if (!(document.pointerLockElement === CameraMatrixController.canvas ||
 		    document.mozPointerLockElement === CameraMatrixController.canvas ||
 		    document.webkitPointerLockElement === CameraMatrixController.canvas)) {
-		  // Pointer was just unlocked
+		 	// Pointer was just unlocked
 			CameraMatrixController.flyToggle = false;
 		}
 	}
@@ -181,15 +181,23 @@ class Cloth {
 function genClothGridPoints(width, height, scale=1) {
 	var clothPoints = new Array(3*width*height);
 
+	// for (var y = 0; y < height; y++) {
+	// 	for (var x = 0; x < width; x++) {
+	// 		var idx = 3*(width*y + x);
+	// 		clothPoints[idx] = (-width/2 + x + 0.5)*scale; 
+	// 		clothPoints[idx + 1] = (height/2 - y - 0.5) *scale;
+	// 		clothPoints[idx + 2] = 0.0;
+	// 	}
+	// }
+
 	for (var y = 0; y < height; y++) {
 		for (var x = 0; x < width; x++) {
 			var idx = 3*(width*y + x);
-			clothPoints[idx] = (-width/2 + x + 0.5)*scale; 
-			clothPoints[idx + 1] = (height/2 - y - 0.5) *scale;
+			clothPoints[idx] = scale*(x + 0.5);
+			clothPoints[idx + 1] = scale*(height - y - 0.5);
 			clothPoints[idx + 2] = 0.0;
 		}
 	}
-
 	return clothPoints;
 }
 
