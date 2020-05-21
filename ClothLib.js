@@ -19,13 +19,13 @@ class CameraMatrixController {
 		this.flySpeed = Abubu.readOption(options.flySpeed, 0.08);
 		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.01);
 
-		this.position = Abubu.readOption(options.position, [0, 0, 1.0]);
+		this.position = Abubu.readOption(options.position, [5.0, 5.0, 10.0]);
 		this.rotation = Abubu.readOption(options.rotation, [0.0, 0.0]);
 
 		this.fieldOfView = Abubu.readOption(options.fieldOfView, Math.PI/2.0);
 		this.aspectRatio = Abubu.readOption(options.aspectRatio, 1.0);
 		this.nearZClip = Abubu.readOption(options.nearZClip, 0.5);
-		this.farZClip = Abubu.readOption(options.farZClip, 15.0);
+		this.farZClip = Abubu.readOption(options.farZClip, 50.0);
 
 		this.perspectiveMatrix = mat4.create();
 		mat4.perspective(this.perspectiveMatrix, this.fieldOfView,
