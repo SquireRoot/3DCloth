@@ -32,25 +32,29 @@
 	console.log('--- 3D Cloth Simulation by Evan Newman ---');
 
 	var modelParams = {
-		clothWidth:  10,
-		clothHeight: 10,
-		clothScale:  1.0,
+
+		clothWidth : 60,
+		clothHeight : 60,
+		clothScale : 1.0,
 
 		displayWidth:  512,
 		displayHeight: 512,
 
-		updateCount: 100,
-		timestep: 0.0001,
-		node_mass: 0.01, 
-		gravity: 0.8,
 
-		k_sheer:   50.0,
-		k_tension: 50.0,
-		k_fold:    50.0,
+		timestep : 0.01,
+		renderInterval : 200,
 
-		d_sheer:   0.01,
-		d_tension: 0.01,
-		d_fold:    0.01
+		k_sheer : 4.0,
+		k_tension : 4.0,
+		k_fold : 4.0,
+
+		d_sheer : 3.0,
+		d_tension : 3.0,
+		d_fold : 3.0,
+
+		point_mass : 1,
+		gravity : -0.01
+
 	}
 
 	var mainCanvas = document.getElementById('main-canvas');
@@ -70,13 +74,6 @@
 	var init_positions = new Float32Array(4*modelParams.clothWidth*modelParams.clothHeight);
 	var init_velocities = new Float32Array(4*modelParams.clothWidth*modelParams.clothHeight);
 	var init_forces = new Float32Array(4*modelParams.clothWidth*modelParams.clothHeight);
-
-	// for (var row = 0; row < modelParams.clothHeight; row++) {
-	// 	for (var col = 0; col < modelParams.clothWidth; col++) {
-	// 		var index = 4*(row*modelParams.clothWidth + col);
-	// 		init_positions[index] = row*row*0.1;
-	// 	}
-	// }
 
 	var e_positions = new Abubu.Float32Texture(modelParams.clothWidth,
 									   		   modelParams.clothHeight,
@@ -108,7 +105,11 @@
 			d_sheer   	  : {type: 'f', value: modelParams.d_sheer},
 			d_tension 	  : {type: 'f', value: modelParams.d_tension},
 			d_fold    	  : {type: 'f', value: modelParams.d_fold},
-			clothScale    : {type: 'f', value: modelParams.clothScale}
+
+			clothScale    : {type: 'f', value: modelParams.clothScale},
+			clothWidth    : {type: 'i', value: modelParams.clothWidth},
+			clothHeight   : {type: 'i', value: modelParams.clothHeight},
+			gravity       : {type: 'f', value: modelParams.gravity}
 		},
 		renderTargets : {
 			forces : {location: 0, target: forces}
@@ -122,9 +123,12 @@
 			in_positions  : {type: 't', value: e_positions},
 			in_velocities : {type: 't', value: e_velocities},
 			forces        : {type: 't', value: forces},
-			node_mass     : {type: 'f', value: modelParams.node_mass},
+
+			clothWidth    : {type: 'i', value: modelParams.clothWidth},
+			clothHeight   : {type: 'i', value: modelParams.clothHeight},
 			timestep  	  : {type: 'f', value: modelParams.timestep},
-			time          : {type: 'f', value: 0}
+			point_mass    : {type: 'f', value: modelParams.point_mass},
+			time          : {type: 'i', value: 0}
 		},
 		renderTargets : {
 			out_positions  : {location: 0, target: o_positions},
@@ -135,6 +139,7 @@
 	var pointPlotter = new Abubu.Solver({
 		vertexShader : plotterVS,
 		fragmentShader : pointPlotterFS,
+		depthTest : true,
 		geometry : {
 			vertices : vertexPoints,
 			noVertices : vertexPoints.length/3,
@@ -153,9 +158,11 @@
 		clear : false
 	});
 
+	colorMaps = Abubu.getColormaps();
 	var sheetPlotter = new Abubu.Solver({
 		vertexShader : plotterVS,
 		fragmentShader : sheetPlotterFS,
+		depthTest : true,
 		geometry : {
 		    vertices : geometryPoints,
 		    noVertices: geometryPoints.length/3, // No of vertices
@@ -167,42 +174,24 @@
 			positions       : {type: 't', value: o_positions},
 			width           : {type: 'i', value: modelParams.clothWidth},
 			height          : {type: 'i', value: modelParams.clothHeight},
-			scale			: {type: 'f', value: modelParams.clothScale}
+
+			scale			: {type: 'f', value: modelParams.clothScale},
+			plotField		: {type: 't', value: forces},
+			colorMap 		: {type: 't', value: colorMaps.parula.texture}
 		},
 		canvas : mainCanvas,
-		clear : true
+		clear : true,
+		clearColor : [0.5, 0.5, 0.5, 1.0]
 	});
+	sheetPlotter.setSamplerMinFilter('plotField', 'LINEAR');
+	sheetPlotter.setSamplerMagFilter('plotField', 'LINEAR');
 
-	// var linePlotter = new Abubu.Solver({
-	// 	vertexShader : plotterVS,
-	// 	fragmentShader : linePlotterFS,
-	// 	geometry : {
-	// 	    vertices : geometryPoints,
-	// 	    noVertices: geometryPoints.length/3, // No of vertices
-	// 	    noCoords  : 3, // No of coordinates
-	// 	    premitive : 'line_strip',
-	// 	},
-	// 	uniforms : {
-	// 		cameraMatrix    : {type: 'mat4', value: camera.getCameraMatrix()},
-	// 		positions       : {type: 't', value: o_positions},
-	// 		width           : {type: 'i', value: modelParams.clothWidth},
-	// 		height          : {type: 'i', value: modelParams.clothHeight},
-	// 		scale			: {type: 'f', value: modelParams.clothScale}
-	// 	},
-	// 	canvas : mainCanvas,
-	// 	clear : false
-	// });
-
-	var stepCount = 0;
+	var timestep = 0;
 	var render = function() {
-		camera.updateCameraMatrix();
-		sheetPlotter.setUniform("cameraMatrix", camera.getCameraMatrix());
-		pointPlotter.setUniform("cameraMatrix", camera.getCameraMatrix());
+		for (var i = 0; i < modelParams.renderInterval; i++) {
+			pointUpdater.setUniform('time', i);
 
-		pointUpdater.setUniform('time', stepCount*modelParams.timestep);
-
-		for (var i = 0; i < modelParams.updateCount; i++) {
-			if (stepCount % 2 === 0) {
+			if (timestep % 2 === 0) {
 				forceUpdater.setUniform('positions', e_positions);
 				forceUpdater.setUniform('velocities', e_velocities);
 
@@ -222,8 +211,13 @@
 
 			forceUpdater.render();
 			pointUpdater.render();
-			stepCount++;
+
+			timestep++;
 		}
+
+		camera.updateCameraMatrix();
+		sheetPlotter.setUniform("cameraMatrix", camera.getCameraMatrix());
+		pointPlotter.setUniform("cameraMatrix", camera.getCameraMatrix());
 
 		sheetPlotter.render();
 		pointPlotter.render();

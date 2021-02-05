@@ -16,16 +16,16 @@ class CameraMatrixController {
 
 	constructor(options={}) {
 
-		this.flySpeed = Abubu.readOption(options.flySpeed, 0.08);
+		this.flySpeed = Abubu.readOption(options.flySpeed, 1.0);
 		this.rotateSpeed = Abubu.readOption(options.rotateSpeed, 0.01);
 
-		this.position = Abubu.readOption(options.position, [5.0, 5.0, 10.0]);
-		this.rotation = Abubu.readOption(options.rotation, [0.0, 0.0]);
+		this.position = Abubu.readOption(options.position, [-15.0, 28.0, 30.0]);
+		this.rotation = Abubu.readOption(options.rotation, [0.0, -0.25*3.14159]);
 
 		this.fieldOfView = Abubu.readOption(options.fieldOfView, Math.PI/2.0);
 		this.aspectRatio = Abubu.readOption(options.aspectRatio, 1.0);
 		this.nearZClip = Abubu.readOption(options.nearZClip, 0.5);
-		this.farZClip = Abubu.readOption(options.farZClip, 50.0);
+		this.farZClip = Abubu.readOption(options.farZClip, 150.0);
 
 		this.perspectiveMatrix = mat4.create();
 		mat4.perspective(this.perspectiveMatrix, this.fieldOfView,
@@ -180,15 +180,6 @@ class Cloth {
 // returns a 3*width*height size matrix 
 function genClothGridPoints(width, height, scale=1) {
 	var clothPoints = new Array(3*width*height);
-
-	// for (var y = 0; y < height; y++) {
-	// 	for (var x = 0; x < width; x++) {
-	// 		var idx = 3*(width*y + x);
-	// 		clothPoints[idx] = (-width/2 + x + 0.5)*scale; 
-	// 		clothPoints[idx + 1] = (height/2 - y - 0.5) *scale;
-	// 		clothPoints[idx + 2] = 0.0;
-	// 	}
-	// }
 
 	for (var y = 0; y < height; y++) {
 		for (var x = 0; x < width; x++) {

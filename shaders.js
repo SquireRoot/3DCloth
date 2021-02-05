@@ -11,7 +11,6 @@ uniform int height;
 uniform float scale;
 
 in vec4 position;
-
 out vec2 texCoord;
 
 void main() {
@@ -21,7 +20,7 @@ void main() {
 	vec4 displacement = texture(positions, texCoord);
 
 	gl_Position = cameraMatrix*(position + displacement);
-	gl_PointSize = 5.0;
+	gl_PointSize = 2.0;
 }
 `;
 
@@ -30,28 +29,25 @@ var sheetPlotterFS = `#version 300 es
 precision highp float;
 precision highp int;
 
-in vec2 texCoord;
 
+uniform sampler2D plotField;
+uniform sampler2D colorMap;
+
+in vec2 texCoord;
 out vec4 color;
 
 uniform sampler2D colors;
 
 void main() {
-	color = vec4(0.0, 0.0, 1.0, 1.0);
-	// color = texture(colors, texCoord);
-	// color.w = 1.0;
-}
-`;
+	float plotMin = 0.0;
+	float plotMax = 0.01;
 
-/*--- Line Plotter Fragment Shader ---*/
-var linePlotterFS = `#version 300 es
-precision highp float;
-precision highp int;
+	vec4 cdata = vec4(0.0, 0.0, 0.0, 1.0);
+	vec4 val = texture(plotField, texCoord);
+	float normVal = (length(val) + plotMin)/(plotMax - plotMin);
 
-out vec4 color;
-
-void main() {
-	color = vec4(0.0, 0.0, 0.0, 1.0);
+	cdata.xyz = texture(colorMap, vec2(normVal, 0.5)).xyz;
+	color = cdata;
 }
 `;
 
@@ -64,12 +60,8 @@ in vec2 texCoord;
 
 out vec4 color;
 
-uniform sampler2D colors; 
-
 void main() {
-	//color = vec4(0.0, 0.0, 1.0, 1.0);
-	color = abs(texture(colors, texCoord))*10.0;
-	color.w = 1.0;
+	color = vec4(0.8, 0.0, 0.0, 1.0);
 }
 `;
 
@@ -99,31 +91,42 @@ uniform sampler2D in_positions;
 uniform sampler2D in_velocities;
 uniform sampler2D forces;
 
-uniform float node_mass;
+
+uniform int clothWidth;
+uniform int clothHeight;
 
 uniform float timestep;
-uniform float time;
+uniform float point_mass;
+
+uniform int time;
 
 layout(location = 0) out vec4 out_positions;
 layout(location = 1) out vec4 out_velocities;
 
 void main() {
-	/* euler integration */
-	out_velocities = texture(in_velocities, pixPos) + timestep*texture(forces, pixPos)/node_mass;
-	out_positions = texture(in_positions, pixPos) + timestep*out_velocities;
 
-	/* boundary conditions */
-	vec2 size = vec2(textureSize(forces, 0));
-	vec2 i = vec2(1.0, 0.0)/size;
-	vec2 j = vec2(0.0, 1.0)/size;
+	vec3 position = texture(in_positions, pixPos).xyz;
+	vec3 velocity = texture(in_velocities, pixPos).xyz;
+	vec3 force = texture(forces, pixPos).xyz;
 
-	if (pixPos.x <= i.x && pixPos.y >= (1.0 - j.y)) {
-		out_velocities = vec4(0.0, 0.0, 0.4*cos(time), 0.0);
-		out_positions = vec4(0.0, 0.0, 0.4*sin(time), 0.0);
-	} else if (pixPos.x >= (1.0 - i.x) && pixPos.y >= (1.0 - j.y)) {
-		out_velocities = vec4(0.0, 0.0, 0.4*cos(time), 0.0);
-		out_positions = vec4(0.0, 0.0, 0.4*sin(time), 0.0);
-	}
+	out_positions = vec4(0.0, 0.0, 0.0, 0.0);
+	out_velocities = vec4(0.0, 0.0, 0.0, 0.0);
+
+	out_velocities.xyz = velocity + timestep*(force/point_mass);
+	out_positions.xyz = position + timestep*out_velocities.xyz;
+
+	vec2 i = vec2(1.0, 0.0)/float(clothWidth);
+	vec2 j = vec2(0.0, 1.0)/float(clothHeight);
+
+	if (pixPos.y >= (1.0 - j.y) && (pixPos.x >= (1.0 - i.x) || pixPos.x <= i.x)) {
+		out_positions = vec4(0.0, 0.0, -1.0, 0.0);
+		out_velocities = vec4(0.0, 0.0, 0.0, 0.0);
+
+		// float omega = 2.0*3.1416/10.0;
+		// float amp = 2.0;
+		// out_positions.z = amp*sin(omega*float(time));
+		// out_velocities.z = amp*omega*cos(omega*float(time));
+	} 
 }
 `;
 
@@ -149,161 +152,92 @@ uniform float d_tension;
 uniform float d_fold;
 
 uniform float clothScale;
+uniform int clothWidth;
+uniform int clothHeight;
 
 layout(location = 0) out vec4 forces;
 
-vec3 calcForce(vec3 this_position, vec3 this_velocity,
-			   vec3 other_position, vec3 other_velocity,
-			   vec3 grid_vec, float k, float d) {
+vec3 getForce(vec3 thisPosition, vec3 thisVelocity, vec2 pointDirVec, float k, float d) {
+	vec2 pointIdxVec = pointDirVec/vec2(clothWidth, clothHeight);
+	vec3 pointVec = vec3(0.0, 0.0, 0.0);
+	pointVec.xy = pointDirVec*clothScale;
 
-	vec3 this_to_other = (grid_vec + other_position) - this_position;
-	vec3 spring_force = k*(length(this_to_other) - length(grid_vec))*this_to_other;
+	vec3 thisToPoint = -thisPosition + pointVec
+					   + texture(positions, pixPos + pointIdxVec).xyz;
+	vec3 thisToPointNorm = normalize(thisToPoint);
 
-	vec3 this_to_other_norm = normalize(this_to_other);
-	float vel_diff = dot((other_velocity - this_velocity), this_to_other_norm);
-	vec3 damping_force = d*vel_diff*this_to_other_norm;
+	vec3 force = k*(length(thisToPoint) - length(pointVec))*thisToPointNorm;
 
-	return damping_force + spring_force;
+	float velDiff = dot((texture(velocities, pixPos + pointIdxVec).xyz - thisVelocity),
+						thisToPointNorm);
+	force = force + d*velDiff*thisToPointNorm;
+
+	return force;
 }
 
 void main() {
-	vec2 size = vec2(textureSize(positions, 0));
-	vec2 i = vec2(1.0, 0.0)/size;
-	vec2 j = vec2(0.0, 1.0)/size;
+	vec2 i = vec2(1.0, 0.0)/float(clothWidth);
+	vec2 j = vec2(0.0, 1.0)/float(clothHeight);
 
-	vec3 this_position = texture(positions, pixPos).xyz;
-	vec3 this_velocity = texture(velocities, pixPos).xyz;
+	vec3 thisPosition = texture(positions, pixPos).xyz;
+	vec3 thisVelocity = texture(velocities, pixPos).xyz;
 
-	vec3 net_force = vec3(0.0, 0.0, 0.0);
+	vec3 netForce = vec3(0.0, gravity, 0.0);
 
-	bool is_not_top = pixPos.y < (1.0 - j.y);
-	bool is_not_bottom = pixPos.y > j.y;
-	bool is_not_left = pixPos.x > i.x;
-	bool is_not_right = pixPos.x < (1.0 - i.x);
-
-	if (is_not_right) {
-		vec3 e1_position = texture(positions, (pixPos + i)).xyz;
-		vec3 e1_velocity = texture(positions, (pixPos + i)).xyz;
-		vec3 e1 = clothScale*vec3(1.0, 0.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  e1_position, e1_velocity,
-										  e1, k_tension, d_tension);
-
-		if (is_not_top) {
-			vec3 ne_position = texture(positions, (pixPos + i + j)).xyz;
-			vec3 ne_velocity = texture(positions, (pixPos + i + j)).xyz;
-			vec3 ne = clothScale*vec3(1.0, 1.0, 0.0);
-
-			net_force = net_force + calcForce(this_position, this_velocity,
-											  ne_position, ne_velocity,
-											  ne, k_sheer, d_sheer);
-		}
-
-		if (is_not_bottom) {
-			vec3 se_position = texture(positions, (pixPos + i - j)).xyz;
-			vec3 se_velocity = texture(positions, (pixPos + i - j)).xyz;
-			vec3 se = clothScale*vec3(1.0, -1.0, 0.0);
-
-			net_force = net_force + calcForce(this_position, this_velocity,
-											  se_position, se_velocity,
-											  se, k_sheer, d_sheer);
-		}
+	if (pixPos.x < (1.0 - i.x)) { // add east spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(1.0, 0.0), k_tension, d_tension);
+	}
+	if (pixPos.x > i.x) { // add west spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(-1.0, 0.0), k_tension, d_tension);
+	}
+	if (pixPos.y < (1.0 - j.y)) { // add north spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(0.0, 1.0), k_tension, d_tension);
+	}
+	if (pixPos.y > j.y) { // add south spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(0.0, -1.0), k_tension, d_tension);
 	}
 
-	if (is_not_left) {
-		vec3 w1_position = texture(positions, (pixPos - i)).xyz;
-		vec3 w1_velocity = texture(positions, (pixPos - i)).xyz;
-		vec3 w1 = clothScale*vec3(-1.0, 0.0, 0.0);
 
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  w1_position, w1_velocity,
-										  w1, k_tension, d_tension);
-
-		if (is_not_top) {
-			vec3 nw_position = texture(positions, (pixPos - i + j)).xyz;
-			vec3 nw_velocity = texture(positions, (pixPos - i + j)).xyz;
-			vec3 nw = clothScale*vec3(-1.0, 1.0, 0.0);
-
-			net_force = net_force + calcForce(this_position, this_velocity,
-											  nw_position, nw_velocity,
-											  nw, k_sheer, d_sheer);
-		}
-
-		if (is_not_bottom) {
-			vec3 sw_position = texture(positions, (pixPos - i - j)).xyz;
-			vec3 sw_velocity = texture(positions, (pixPos - i - j)).xyz;
-			vec3 sw = clothScale*vec3(-1.0, -1.0, 0.0);
-
-			net_force = net_force + calcForce(this_position, this_velocity,
-											  sw_position, sw_velocity,
-											  sw, k_sheer, d_sheer);
-		}
+	if (pixPos.x < (1.0 - i.x) && pixPos.y < (1.0 - j.y)) { // add northeast spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(1.0, 1.0), k_sheer, d_sheer);
+	}
+	if (pixPos.x < (1.0 - i.x) && pixPos.y > j.y) { // add southeast spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(1.0, -1.0), k_sheer, d_sheer);
+	}
+	if (pixPos.x > i.x && pixPos.y > j.y) { // add southwest spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(-1.0, -1.0), k_sheer, d_sheer);
+	}
+	if (pixPos.x > i.x && pixPos.y < (1.0 - j.y)) { // add northwest spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(-1.0, 1.0), k_sheer, d_sheer);
 	}
 
-	if (is_not_top) {
-		vec3 n1_position = texture(positions, (pixPos + j)).xyz;
-		vec3 n1_velocity = texture(positions, (pixPos + j)).xyz;
-		vec3 n1 = clothScale*vec3(0.0, 1.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  n1_position, n1_velocity,
-										  n1, k_tension, d_tension);
+	if (pixPos.x < (1.0 - 2.0*i.x)) { // add east2 spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(2.0, 0.0), k_fold, d_fold);
+	}
+	if (pixPos.x > 2.0*i.x) { // add west2 spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(-2.0, 0.0), k_fold, d_fold);
+	}
+	if (pixPos.y < (1.0 - 2.0*j.y)) { // add north2 spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(0.0, 2.0), k_fold, d_fold);
+	}
+	if (pixPos.y > 2.0*j.y) { // add south2 spring force
+		netForce = netForce + getForce(thisPosition, thisVelocity,
+									   vec2(0.0, -2.0), k_fold, d_fold);
 	}
 
-	if (is_not_bottom) {
-		vec3 s1_position = texture(positions, (pixPos - j)).xyz;
-		vec3 s1_velocity = texture(positions, (pixPos - j)).xyz;
-		vec3 s1 = clothScale*vec3(0.0, -1.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  s1_position, s1_velocity,
-										  s1, k_tension, d_tension);
-	}
-
-	if (pixPos.x < (1.0 - 2.0*i.x)) { // not the rightmost two columns
-		vec3 e2_position = texture(positions, (pixPos + 2.0*i)).xyz;
-		vec3 e2_velocity = texture(positions, (pixPos + 2.0*i)).xyz;
-		vec3 e2 = clothScale*vec3(2.0, 0.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  e2_position, e2_velocity,
-										  e2, k_fold, d_fold);
-	}
-
-	if (pixPos.x > 2.0*i.x) { // not the leftmost two columns
-		vec3 w2_position = texture(positions, (pixPos - 2.0*i)).xyz;
-		vec3 w2_velocity = texture(positions, (pixPos - 2.0*i)).xyz;
-		vec3 w2 = clothScale*vec3(-2.0, 0.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  w2_position, w2_velocity,
-										  w2, k_fold, d_fold);
-	}
-
-	if (pixPos.y > 2.0*j.y) { // not the bottom two rows
-		vec3 s2_position = texture(positions, (pixPos - 2.0*j)).xyz;
-		vec3 s2_velocity = texture(positions, (pixPos - 2.0*j)).xyz;
-		vec3 s2 = clothScale*vec3(0.0, -2.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  s2_position, s2_velocity,
-										  s2, k_fold, d_fold);
-	}
-
-	if (pixPos.y < (1.0 - 2.0*j.y)) { // not the top two rows
-		vec3 n2_position = texture(positions, (pixPos + 2.0*j)).xyz;
-		vec3 n2_velocity = texture(positions, (pixPos + 2.0*j)).xyz;
-		vec3 n2 = clothScale*vec3(0.0, 2.0, 0.0);
-
-		net_force = net_force + calcForce(this_position, this_velocity,
-										  n2_position, n2_velocity,
-										  n2, k_fold, d_fold);
-	}
-
-	forces = vec4(0.0, -gravity*node_mass, 0.0, 0.0);
-	//forces = vec4(0.0, 0.0, 0.0, 0.0);
-	forces.xyz = forces.xyz + net_force;
+	forces = vec4(0.0, 0.0, 0.0, 0.0);
+	forces.xyz = netForce;
 }
 
 `;

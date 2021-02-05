@@ -21633,6 +21633,7 @@ this.Plot2D              = Plot2D ;
 this.Tvsx                = Tvsx ;
 this.VolumeRayCaster     = VolumeRayCaster ;
 this.getColormapList     = getColormapList ;
+this.getColormaps        = getColormaps ;
 this.Probe               = Probe ;
 this.TextureReader       = TextureReader ;
 this.ProbeRecorder       = ProbeRecorder ;
